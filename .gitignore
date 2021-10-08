@@ -10,6 +10,10 @@ _site/
 vendor/
 ### End ignore ideas from https://jekyllrb.com/tutorials/using-jekyll-with-bundler/
 
+### Ignore the as-built site
+plots/
+### end Ignore the as-built site
+
 ### Ignore Python project typical files.
 ### These are some of github's ignore lines for a Python project
 
