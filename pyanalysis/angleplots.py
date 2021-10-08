@@ -1,15 +1,24 @@
 #!/usr/bin/env python
 import numpy as np
 import pylab as plt
+import argparse
+import os
+import common
+
+depends = (__file__, "common.py")
 
 
-def makeplots():
-    plt.figure(2, (4.5, 1.5))
+def makeplots(force=True):
+    common.myfigure((4.5, 1.5))
     for angle in np.linspace(-45, 45, 13):
-        print("Making plot at angle {:+5.1f} degrees".format(angle))
-        makeplot(angle)
-        plt.tight_layout()
-        plt.savefig("../plots/cartoons/angle{:.0f}.png".format(angle))
+        output_name = "../plots/cartoons/angle{:.0f}.png".format(angle)
+        if force or common.needs_updating(output_name, depends):
+            print("Making plot at angle {:+5.1f} degrees".format(angle))
+            makeplot(angle)
+            plt.tight_layout()
+            plt.savefig(output_name)
+        else:
+            print("Plot at angle {:+5.1f} degrees is up to date...skipping.".format(angle))
 
 
 def makeplot(angle):
@@ -62,5 +71,13 @@ def makeplot(angle):
     plt.yticks(())
 
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--force-update", action="store_true",
+                        help="update all plots, even if they are newer than the code")
+    args = parser.parse_args()
+    makeplots(force=args.force_update)
+
+
 if __name__ == "__main__":
-    makeplots()
+    main()
