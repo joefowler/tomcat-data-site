@@ -6,6 +6,7 @@ import pylab as plt
 def makeplots():
     plt.figure(2, (4.5, 1.5))
     for angle in np.linspace(-45, 45, 13):
+        print("Making plot at angle {:+5.1f} degrees".format(angle))
         makeplot(angle)
         plt.tight_layout()
         plt.savefig("../plots/cartoons/angle{:.0f}.png".format(angle))

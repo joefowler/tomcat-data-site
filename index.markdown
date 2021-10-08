@@ -4,3 +4,8 @@
 
 layout: home
 ---
+
+Each new measurement gets its own directory:
+
+* [Slab targets](slab2021)
+* [Nano-pattern target A](nano2021a)
