@@ -18,7 +18,7 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 
-title: TOMCAT Slab Target Data 2021
+title: TOMCAT Tomography Data 2021
 email: joe.fowler at nist.gov
 description: >- # this means to ignore newlines until "baseurl:"
   Analysis of the September-October 2021 TOMCAT data, with plots.
@@ -31,6 +31,12 @@ github_username:  joefowler
 theme: minima
 plugins:
   - jekyll-feed
+
+defaults:
+  - scope:
+      path: "plots"
+    values:
+      image: true
 
 # Exclude from processing.
 # The following items will not be processed, by default.
@@ -51,5 +57,7 @@ plugins:
 #   - vendor/cache/
 #   - vendor/gems/
 #   - vendor/ruby/
+include:
+  - plots/
 exclude:
   - pyanalysis/
