@@ -12,6 +12,8 @@ vendor/
 
 ### Ignore the as-built site
 plots/
+slab2021/*.md
+slab2021/scans/scan*.md
 ### end Ignore the as-built site
 
 ### Ignore Python project typical files.
