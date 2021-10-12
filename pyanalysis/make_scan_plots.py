@@ -176,6 +176,85 @@ title: All radiographs
             fp.write(line)
 
 
+class ScanSummary():
+    def __init__(self, scan=None):
+        if scan is None:
+            return
+        self.angle = scan.angle
+        self.file = scan.filename
+        self.nscans = 1
+        if "inner" in scan.filename:
+            self.nouter, self.ninner = 0, 1
+        else:
+            self.nouter, self.ninner = 1, 0
+        self.duration = scan.duration.sum()
+        self.nphot_total = 0
+        self.nphot_pt = 0
+        for cnum in scan.xdet.keys():
+            chan = scan.h5["tes/chan{:03d}".format(cnum)]
+            self.nphot_total += np.sum(chan["counts"])
+            self.nphot_pt += np.sum(chan["sig"], axis=0)[0]
+        self.bytes = os.stat(scan.h5.filename).st_size
+
+    def __add__(self, other):
+        sum = ScanSummary()
+        if self.angle == other.angle:
+            sum.angle = self.angle
+        else:
+            sum.angle = "All angles"
+        sum.file = ", ".join((self.file, other.file))
+        sum.nscans = self.nscans + other.nscans
+        sum.nouter = self.nouter + other.nouter
+        sum.ninner = self.ninner + other.ninner
+        sum.duration = self.duration + other.duration
+        sum.nphot_pt = self.nphot_pt + other.nphot_pt
+        sum.nphot_total = self.nphot_total + other.nphot_total
+        sum.bytes = self.bytes + other.bytes
+        return sum
+
+    def tableline(self):
+        if isinstance(self.angle, str):
+            angle = self.angle
+        elif self.angle == 0.0:
+            angle = "0.0"
+        else:
+            angle = "{:+.1f}<sup>o</sup>".format(self.angle)
+            angle = angle.replace("-", "&minus;")
+        return "| {:17s} | {:d} | {:d}+{:d} | {:.2f} | {:.1f} | {:.0f} | {:.1f} MB |".format(
+            angle, self.nscans, self.nouter, self.ninner, self.duration/3600,
+            self.nphot_pt/1e6, self.nphot_total/1e6, self.bytes/1e6)
+
+
+def make_summary_table(files, force=False):
+    N = len(files)
+    results = {}
+    for file in files:
+        s = onescan.OneScan(file)
+        print("Analyzing {} for summary".format(s.filename))
+        summary = ScanSummary(s)
+        a = s.angle
+        if a in results:
+            results[a] = results[a] + summary
+        else:
+            results[a] = summary
+    keys = list(results.keys())
+    keys.sort()
+    allscans = results[keys[0]]
+    for k in keys[1:]:
+        allscans = allscans + results[k]
+
+    with open("../slab2021/data_summary.md", "w") as fp:
+        lines = []
+        lines.append(
+            "| Angle | Scans<br/>total | Scans<br/>out+in | Time (hr) | Photons/1M<br/>Pt L&alpha; | Photons/1M<br/>TES Total | File size |")
+        lines.append("| ----: | ----: | -------: | --------: | ----------: | ----: | -----: |")
+        lines.append(allscans.tableline())
+        for k in keys:
+            lines.append(results[k].tableline())
+
+        fp.write("\n".join(lines))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Make scan plots and web pages.")
     parser.add_argument("-f", "--force-update", action="store_true",
@@ -212,6 +291,7 @@ def main():
                 next = files[i+1]
             make_scan_page(f, force=args.force_update, prev=prev, next=next)
         make_radiographs_page(files, force=args.force_update)
+        make_summary_table(files, force=args.force_update)
 
 
 if __name__ == "__main__":
