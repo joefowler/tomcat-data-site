@@ -16,31 +16,84 @@ class Radiograph:
         self.xpixsize = np.median(np.diff(xctr))
         self.ypixsize = np.median(np.diff(yctr))
         self.Nx, self.Ny = rg.shape
-        # self.edges =
 
     def copy(self):
         return Radiograph(self.rg, self.uncert, self.wt, self.xctr, self.yctr, self.xyedges,
                           self.basename, self.angle)
 
-    def plot(self):
+    def add(self, other, shiftx=0, shifty=0):
+        if self.angle != other.angle:
+            raise ValueError("Cannot add radiographs from unequal angles: {}, {}".format(
+                self.angle, other.angle))
+
+        def wtadd(A, wa, B, wb):
+            A = A.copy()
+            B = B.copy()
+            wb = wb.copy()
+            if shiftx > 0:
+                B[:-shiftx, :] = B[shiftx:, :]
+                B[-shiftx, :] = 0
+                wb[:-shiftx, :] = wb[shiftx:, :]
+                wb[-shiftx, :] = 0
+            elif shiftx < 0:
+                B[-shiftx:, :] = B[:shiftx, :]
+                wb[-shiftx:, :] = wb[:shiftx, :]
+            if shifty > 0:
+                B[:, :-shifty] = B[:, shifty:]
+                B[:, -shifty] = 0
+                wb[:, :-shifty] = wb[:, shifty:]
+                wb[:, -shifty] = 0
+            elif shifty < 0:
+                B[:, -shifty:] = B[:, :shifty]
+                wb[:, -shifty:] = wb[:, :shifty]
+            A[np.isnan(A) & ~np.isnan(B)] = 0
+            B[np.isnan(B) & ~np.isnan(A)] = 0
+            return (A*wa+B*wb)/(wa+wb)
+
+        w1 = self.uncert**-2
+        w2 = other.uncert**-2
+        w1[np.isnan(w1)] = 0
+        w2[np.isnan(w2)] = 0
+
+        rg = wtadd(self.rg, w1, other.rg, w2)
+        wt = wtadd(self.wt, w1, other.wt, w2)
+        uncert = wtadd(self.uncert, w1, other.uncert, w2)
+        basename = ", ".join((self.basename, other.basename))
+        return Radiograph(rg, uncert, wt, self.xctr, self.yctr, self.xyedges, basename,
+                          self.angle)
+
+    def plot(self, name="rg", vmin=None, vmax=None):
         plt.clf()
         plt.title("Radiograph of {}".format(self.basename))
-        ax = plt.subplot(111)
+        ax = plt.subplot(111, aspect="equal")
         xpix, ypix = self.xyedges
-        plt.pcolor(xpix, ypix, self.rg, vmin=.0014, vmax=.003, cmap=plt.cm.inferno)
-        ax.set_aspect("equal")
+        z = self.rg
+
+        if name == "rg":
+            z = self.rg
+            if vmin is None:
+                vmin = .0014
+            if vmax is None:
+                vmax = .003
+        elif name == "wt":
+            z = self.wt
+        elif name.startswith("un"):
+            z = self.uncert
+        elif name.startswith("sig"):
+            z = self.rg/self.uncert
+        plt.pcolor(xpix, ypix, z, vmin=vmin, vmax=vmax, cmap=plt.cm.inferno)
         plt.colorbar(fraction=.07, location="bottom")
         plt.xlabel("X location (mm)")
         plt.ylabel("Y location (mm)")
 
     def smoother(self):
+        raise NotImplementedError("This smoother isn't working yet, I think")
         x = self.xyedges[0][:-1, :-1].ravel()+self.xpixsize*0.5
         y = self.xyedges[1][:-1, :-1].ravel()+self.ypixsize*0.5
         weight = 1.0/self.uncert.ravel()
         weight[np.isnan(weight)] = 0
         weight[weight < 0] = 0
         poswgt = weight > 0
-        raise NotImplementedError("This smoother isn't working yet, I think")
         return sp.interpolate.SmoothBivariateSpline(x[poswgt], y[poswgt], self.rg.ravel()[poswgt], weight[poswgt])
 
     def spline(self):
@@ -68,40 +121,57 @@ def rgs_var(g, h, xoff, yoff):
 
 
 def compare_graphs(g, h, xoffctr=0, yoffctr=0):
-    chi2x = []
+    chi2x, chi2y = [], []
     nsteps = 7
-    allxoff = np.arange(xoffctr-nsteps, xoffctr+nsteps+1)
+
+    mg, vg = g.rg, g.uncert**2
+    mh = h.spline()
+    z = h.uncert**2
+    z[np.isnan(z)] = np.nanmedian(z)
+    vh = sp.interpolate.RectBivariateSpline(h.xctr, h.yctr, z)
+    x = g.xctr
+    y = g.yctr
+    print("Try one now")
+    print(x.shape, y.shape)
+    print(mh(x, y).shape)
+
+    allxoff = np.linspace(xoffctr-nsteps, xoffctr+nsteps, 5*nsteps+1)
     for xoff in allxoff:
         yoff = yoffctr
-        mg, mh, vg, vh = rgs_var(g, h, xoff, yoff)
-        chisq = (mg-mh)**2/(vg+vh)
+        # mg, mh, vg, vh = rgs_var(g, h, xoff, yoff)
+        # chisq = (mg-mh)**2/(vg+vh)
+        chisq = (mg-mh(x, y+xoff*g.xpixsize))**2/(vg+vh(x, y+yoff*g.ypixsize))
         chisq[np.isnan(chisq)] = 0
         chi2x.append(chisq[chisq > 0].mean())
+    chi2x = np.array(chi2x)
 
-    chi2y = []
-    allyoff = np.arange(yoffctr-nsteps, yoffctr+nsteps+1)
+    allyoff = np.linspace(yoffctr-nsteps, yoffctr+nsteps, 4*nsteps+1)
     for yoff in allyoff:
         xoff = xoffctr
-        mg, mh, vg, vh = rgs_var(g, h, xoff, yoff)
-        chisq = (mg-mh)**2/(vg+vh)
+        # mg, mh, vg, vh = rgs_var(g, h, xoff, yoff)
+        # chisq = (mg-mh)**2/(vg+vh)
+        chisq = (mg-mh(x, y+xoff*g.xpixsize))**2/(vg+vh(x, y+yoff*g.ypixsize))
         chisq[np.isnan(chisq)] = 0
         chi2y.append(chisq[chisq > 0].mean())
+    chi2y = np.array(chi2y)
 
     plt.clf()
     plt.subplot(211)
     plt.plot(allxoff, chi2x, "o-")
-    f = np.poly1d(np.polyfit(allxoff[nsteps-3:nsteps+4], chi2x[nsteps-3:nsteps+4], 2))
+    fituse = np.abs(allxoff-xoffctr) <= 2
+    f = np.poly1d(np.polyfit(allxoff[fituse], chi2x[fituse], 2))
     plt.plot(allxoff, f(allxoff), "--")
-    plt.plot(allxoff[nsteps-3:nsteps+4], f(allxoff[nsteps-3:nsteps+4]), color="C1")
+    plt.plot(allxoff[fituse], f(allxoff[fituse]), color="C1")
     plt.xlabel("Pixel shift in x")
     plt.ylabel("<$\\chi^2$> non-empty pix")
     xoff = f.deriv(1).roots[0]
 
     plt.subplot(212)
     plt.plot(allyoff, chi2y, "o-")
-    f = np.poly1d(np.polyfit(allyoff[nsteps-3:nsteps+4], chi2y[nsteps-3:nsteps+4], 2))
+    fituse = np.abs(allyoff-yoffctr) <= 2
+    f = np.poly1d(np.polyfit(allyoff[fituse], chi2y[fituse], 2))
     plt.plot(allyoff, f(allyoff), "--")
-    plt.plot(allyoff[nsteps-3:nsteps+4], f(allyoff[nsteps-3:nsteps+4]), color="C1")
+    plt.plot(allyoff[fituse], f(allyoff[fituse]), color="C1")
     plt.xlabel("Pixel shift in y")
     plt.ylabel("<$\\chi^2$> non-empty pix")
     yoff = f.deriv(1).roots[0]
