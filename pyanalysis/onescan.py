@@ -47,7 +47,7 @@ class OneScan():
         self.Nx, self.Xcoords = findgrid(self.target[:, 0])
         self.Ny, self.Ycoords = findgrid(self.target[:, 1])
 
-    def tes_rate(self):
+    def plot_tes_rate(self):
         plt.clf()
         plt.subplot(111, aspect="equal")
         plt.xlabel("TES X position (µm)")
@@ -63,7 +63,7 @@ class OneScan():
             plt.text(self.xdet[k], self.ydet[k], "{:.1f}".format(
                 v), color=color, ha="center", va="center", fontsize="x-small")
 
-    def eds_summary(self):
+    def plot_eds_summary(self):
         "Plot a summary of the EDS rate vs time for this scan."
         plt.clf()
         ax = plt.subplot(211)

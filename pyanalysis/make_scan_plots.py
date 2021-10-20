@@ -66,7 +66,7 @@ def make_scan_plots(filename, force=False):
         dependencies = depends+[filename, "onescan.py"]
         if common.needs_updating(output_plot, dependencies):
             common.myfigure((6, 7), 22)
-            scan.eds_summary()
+            scan.plot_eds_summary()
             plt.tight_layout()
             plt.savefig(output_plot)
 
@@ -82,7 +82,7 @@ def make_scan_plots(filename, force=False):
         dependencies = depends+[filename, "onescan.py"]
         if common.needs_updating(output_plot, dependencies):
             common.myfigure((5.5, 4.5), 25)
-            scan.tes_rate()
+            scan.plot_tes_rate()
             plt.tight_layout()
             plt.savefig(output_plot)
 
@@ -216,9 +216,9 @@ class ScanSummary():
         if isinstance(self.angle, str):
             angle = self.angle
         elif self.angle == 0.0:
-            angle = "0.0"
+            angle = "0.0&deg;"
         else:
-            angle = "{:+.1f}<sup>o</sup>".format(self.angle)
+            angle = "{:+.1f}&deg;".format(self.angle)
             angle = angle.replace("-", "&minus;")
         return "| {:17s} | {:d} | {:d}+{:d} | {:.2f} | {:.1f} | {:.0f} | {:.1f} MB |".format(
             angle, self.nscans, self.nouter, self.ninner, self.duration/3600,
@@ -253,6 +253,26 @@ def make_summary_table(files, force=False):
             lines.append(results[k].tableline())
 
         fp.write("\n".join(lines))
+
+
+def make_good_dets_table():
+    files = get_all_hdf5s_sorted()
+    ratios = []
+    with open("good_dets_table.csv", "w") as fp:
+        for f in files:
+            scan = onescan.OneScan(f)
+            r = np.array([v for v in scan.medianrates.values()])
+            ratios.append(r/scan.medianrate)
+
+            # Report
+            ratio = np.array([scan.medianrates.get(c, 0)/scan.medianrate for c in range(241)])
+            good = np.abs(ratio-1.0) < 0.1
+            goodlist = ",".join([str(i) for i in np.arange(241)[good]])
+            fp.write("{},{},{}\n".format(scan.basename, good.sum(), goodlist))
+            print("{:40s}  {:3d} good sensors with ±10% of median rate of {:.2f} cps".format(
+                scan.basename, good.sum(), scan.medianrate))
+
+    return np.hstack(ratios)
 
 
 def main():

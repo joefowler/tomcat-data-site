@@ -14,6 +14,7 @@ vendor/
 plots/
 slab2021/*.md
 slab2021/scans/scan*.md
+pyanalysis/plots_cache/*.p??
 ### end Ignore the as-built site
 
 ### Ignore Python project typical files.
@@ -47,6 +48,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+.DS_Store
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
