@@ -374,3 +374,48 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
                                (xedges, yedges), scan.basename, scan.angle)
     rg.total_photons = total_photons
     return rg
+
+
+def compute_8_radiographs(scan, voxsize_nm=50.0, std_extent=True):
+    """
+    Compute radiographs from `scan` 8 ways: w/o and w/ x-flip parity,
+    and with the TES array coordinates rotated by (0, 90, 180, 270) degrees.
+    Return a list of all 8, and (try to) plot them, too.
+    """
+    rg1 = [compute_radiograph(scan, parity=False, rotation=r, voxsize_nm=voxsize_nm,
+                              std_extent=std_extent) for r in (0, 90, 180, 270)]
+    rg2 = [compute_radiograph(scan, parity=True, rotation=r, voxsize_nm=voxsize_nm,
+                              std_extent=std_extent) for r in (0, 90, 180, 270)]
+    rg1.extend(rg2)
+    try:
+        plot_8_radiographs(rg1)
+    except:
+        pass
+    return rg1
+
+
+def plot_8_radiographs(rgs):
+    "See compute_8_radiographs()"
+    midpct = 98
+    plo, phi = np.nanpercentile(rgs[0].rg.ravel(), [50-midpct/2, 50+midpct/2])
+    dp = phi-plo
+    vmin = plo  # -dp*5/midpct
+    vmax = phi  # +dp*5/midpct
+    plt.clf()
+    for i, rg in enumerate(rgs):
+        j = 1+2*i
+        if i > 3:
+            j = 2*i-6
+        plt.subplot(4, 2, j, aspect="equal")
+        xpix, ypix = rg.xyedges
+        z = rg.rg
+        plt.pcolor(xpix, -ypix, z, vmin=vmin, vmax=vmax, cmap=plt.cm.inferno)
+        rotation = [0, 90, 180, 270][i % 4]
+        if i > 3:
+            title = "x$\\rightarrow -$x parity flip, TES plane rotation {}$^\\circ$".format(
+                rotation)
+            plt.yticks([])
+        else:
+            title = "No parity flip, TES plane rotation {}$^\\circ$".format(rotation)
+        plt.title(title)
+    plt.tight_layout()
