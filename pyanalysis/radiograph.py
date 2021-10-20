@@ -62,7 +62,7 @@ class Radiograph:
         return Radiograph(rg, uncert, wt, self.xctr, self.yctr, self.xyedges, basename,
                           self.angle)
 
-    def plot(self, name="rg", vmin=None, vmax=None):
+    def plot(self, name="rg", vmin=None, vmax=None, midpct=95):
         plt.clf()
         plt.title("Radiograph of {}".format(self.basename))
         ax = plt.subplot(111, aspect="equal")
@@ -71,20 +71,31 @@ class Radiograph:
 
         if name == "rg":
             z = self.rg
-            if vmin is None:
-                vmin = .0014
-            if vmax is None:
-                vmax = .003
         elif name == "wt":
             z = self.wt
         elif name.startswith("un"):
             z = self.uncert
         elif name.startswith("sig"):
             z = self.rg/self.uncert
-        plt.pcolor(xpix, ypix, z, vmin=vmin, vmax=vmax, cmap=plt.cm.inferno)
+
+        # If the vmin and/or vmax aren't given, we need to choose them.
+        # Instead of the default (set equal to the lowest and highest z values),
+        # We'll set the scale so that the middle `midpct` values use the
+        # middle `midpct` of the color scale.
+        if midpct > 99:
+            midpct = 99
+        elif midpct < 1:
+            midpct = 1
+        plo, phi = np.nanpercentile(z.ravel(), [50-midpct/2, 50+midpct/2])
+        dp = phi-plo
+        if vmin is None:
+            vmin = plo-dp*5/midpct
+        if vmax is None:
+            vmax = phi+dp*5/midpct
+        plt.pcolor(xpix, -ypix, z, vmin=vmin, vmax=vmax, cmap=plt.cm.inferno)
         plt.colorbar(fraction=.07, location="bottom")
         plt.xlabel("X location (mm)")
-        plt.ylabel("Y location (mm)")
+        plt.ylabel("$-$Y location (mm)")
 
     def smoother(self):
         raise NotImplementedError("This smoother isn't working yet, I think")
