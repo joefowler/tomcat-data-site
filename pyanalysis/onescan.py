@@ -32,6 +32,7 @@ class OneScan():
         self.targetend = f["steps/endPos_sampleFixed"][:, :2]
         self.command = f["steps/command_sampleFixed"][:, :2]
         self.offset = self.command-self.target
+        self.drift = self.targetend-self.target
         self.duration = f["times/duration"][:]
         self.medianrates = {}
         self.xdet = {}
@@ -173,8 +174,7 @@ def summarize_scan(scan):
     plt.ylabel("Y location (mm)")
     plt.legend()
 
-    dx = (scan.offset[1:, 0] - scan.offset[:-1, 0])*1e6
-    dy = (scan.offset[1:, 1] - scan.offset[:-1, 1])*1e6
+    dx, dy = (scan.drift.T)*1e6
     d = np.sqrt(dx**2+dy**2)
     ax = plt.subplot(412)
 
@@ -192,7 +192,7 @@ def summarize_scan(scan):
     bot = scan.Ycoords[0]-.5*ystep
     top = scan.Ycoords[-1]+.5*ystep
     plt.subplot(412)
-    plt.title("Drift during each step but the last")
+    plt.title("Drift during each step")
     plt.imshow(map, extent=(lft, rgt, bot, top), origin="lower", aspect="equal", cmap=plt.cm.magma)
     for i, (x, y) in enumerate(zip(dx, dy)):
         tx, ty = scan.target[i, :2]
