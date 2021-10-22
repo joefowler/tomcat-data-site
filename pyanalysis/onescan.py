@@ -31,8 +31,9 @@ class OneScan():
         self.target = f["steps/corrected_sampleFixed"][:, :2]
         self.targetend = f["steps/endPos_sampleFixed"][:, :2]
         self.command = f["steps/command_sampleFixed"][:, :2]
-        self.offset = self.command-self.target
+        self.offset = self.target-self.command
         self.drift = self.targetend-self.target
+
         self.duration = f["times/duration"][:]
         self.medianrates = {}
         self.xdet = {}
@@ -139,6 +140,33 @@ class OneScan():
             x, y = self.targetend.T
             plt.plot(x, y, "o", color=color, ms=4)
 
+    def plot_timewt_drift(self, axis=None):
+        "Plot time-weighted drift"
+        alldrifts = []
+        for d in self.drift:
+            dist = 1e6*((d**2).sum()**0.5)
+            dsec = np.linspace(-dist*.5, dist*.5, 65)
+            alldrifts.extend(dsec)
+
+        if axis is None:
+            plt.clf()
+            axis = plt.subplot(111)
+            plt.grid(True)
+
+        Nbins = 100
+        plt.hist(np.abs(alldrifts), Nbins, [0, 200], histtype="step", color="green", lw=2)
+        plt.xlim([0, 200])
+        plt.xlabel("Position error (nm)")
+        plt.ylabel("Time at error (sec per 2 nm bin)")
+        plt.title("Time-weighted position error {}".format(self.basename))
+        drift_quantiles = np.percentile(np.abs(alldrifts), [50, 90])
+        print("Drift median: {:.2f} nm, 90%ile: {:.2f} nm".format(*drift_quantiles))
+        plt.text(.5, .9, "Drift < {:.2f} nm 50% of time".format(
+            drift_quantiles[0]), transform=axis.transAxes, color="r", bbox=dict(facecolor="w", alpha=0.9))
+        plt.text(.5, .8, "Drift < {:.2f} nm 90% of time".format(
+            drift_quantiles[1]), transform=axis.transAxes, color="r", bbox=dict(facecolor="w", alpha=0.9))
+
+
 
 def findgrid(x, mindist=2e-4):
     """
@@ -200,7 +228,7 @@ def summarize_scan(scan):
         plt.plot(tx, ty, "o", color="w", ms=2)
 
     plt.subplot(413)
-    plt.title("Change in offset with each step")
+    plt.title("Drift (change in offset) with each step")
     plt.plot(dx, "-o", ms=3, label="x")
     plt.plot(dy, "-o", ms=3, label="y")
     plt.plot(np.zeros_like(dx), "k")
@@ -208,7 +236,7 @@ def summarize_scan(scan):
     plt.legend()
 
     dist = (dx**2+dy**2)**.5
-    titles = ("X offset (nm)", "Y offset (nm)", "Offset (nm)")
+    titles = ("X drift (nm)", "Y drift (nm)", "Total drift (nm)")
     for i, d in enumerate((dx, dy, dist)):
         ax = plt.subplot(4, 4, 13+i)
         if d.min() >= 0:
@@ -226,7 +254,7 @@ def summarize_scan(scan):
         plt.xlim(hrange)
 
     ax = plt.subplot(4, 4, 16)
-    plt.title("Drift offsets")
+    plt.title("Drift")
     ax.set_aspect("equal")
     good = dist < 100
     xrange = dx.max()-dx.min()
