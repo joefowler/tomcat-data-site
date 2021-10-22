@@ -4,6 +4,8 @@ layout: home
 
 <h1> Platinum layer target. September-October 2021</h1>
 
+<a href="..">Up: slab target overview</a>
+
 <h2>All scans analyzed to date </h2>
 <ul>
 {%- assign default_paths = site.pages | map: "path" -%}

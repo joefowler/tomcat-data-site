@@ -14,7 +14,6 @@ layout: home
 {% include_relative data_summary.md %}
 
 <h2>Table of contents</h2>
-These should be links:
-* Scan summaries: key quantities as a function of time
+* Scan summaries: key quantities as a function of time (*not ready*)
 * [Scans: 1 page per scan](scans/)
-* Angles: 1 page per angle
+* Angles: 1 page per angle (*not ready*)
