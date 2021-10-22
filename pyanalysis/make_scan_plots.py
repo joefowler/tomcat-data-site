@@ -5,12 +5,13 @@ import argparse
 import os
 import glob
 import time
+from collections import OrderedDict
 
 import common
 import onescan
 
 depends = [__file__, "common.py"]
-DIR = "/Volumes/Data2017/Data_Tomcat/tomcat2021/slab/"
+DIR = "/Users/fowlerj/data/tomcat2021/slab/"
 
 
 def get_all_hdf5s_sorted():
@@ -124,6 +125,15 @@ def make_scan_page(filename, force=False, prev=None, next=None):
             nextpage = "next: scan_{}.html\n".format(
                 nbase.replace("Results_", "").replace(".hdf5", ""))
 
+        plotfiles = OrderedDict()
+        plotfiles["Radiograph"] = "/plots/Radiographs/rg_{}.png".format(partialname)
+        plotfiles["TES rates"]: "/plots/TESrates/rate_{}.png".format(partialname)
+        plotfiles["Offset squares"] = "/plots/Targets/{}".format(targets_plot)
+        plotfiles["Scan analysis"] = "/plots/ScanPlots/{}".format(scan_plot)
+        plotfiles["EDS analysis"] = "/plots/EDSPlots/{}".format(eds_plot)
+        allplots_markdown = "\n\n".join(["![]({})".format(f) for f in plotfiles.values()])
+
+        pagedate = time.ctime()
         print("Updating scan page '{}'.".format(output_page))
         L = locals()
         contents = """---
@@ -133,18 +143,27 @@ layout: page
 [Up: Index of all scans](/slab2021/scans)
 
 Scan file name: {base}
-![](/plots/cartoons/angle{intangle}.png)
 
-![](/plots/Radiographs/rg_{partialname}.png)
+{allplots_markdown}
 
-![](/plots/TESrates/rate_{partialname}.png)
+# Page produced
 
-![](/plots/Targets/{targets_plot})
-
-![](/plots/ScanPlots/{scan_plot})
-
-![](/plots/EDSPlots/{eds_plot})
+| What | Date |
+| ---- | ---- |
+| Page text | {pagedate} |
 """.format(**L)
+        plottimes = []
+        for k in plotfiles:
+            file = "..{}".format(plotfiles[k])
+            try:
+                mtime = os.stat(file).st_mtime
+            except FileNotFoundError:
+                continue
+            date = time.ctime(mtime)
+            t = "| {} | {} |".format(k, date)
+            plottimes.append(t)
+        contents += "\n".join(plottimes)
+
         with open(output_page, "w") as fp:
             fp.write(contents)
 
@@ -229,14 +248,19 @@ def make_summary_table(files, force=False):
     N = len(files)
     results = {}
     for file in files:
-        s = onescan.OneScan(file)
-        print("Analyzing {} for summary".format(s.filename))
-        summary = ScanSummary(s)
-        a = s.angle
-        if a in results:
-            results[a] = results[a] + summary
-        else:
-            results[a] = summary
+        print("Analyzing {} for summary".format(file))
+        try:
+            s = onescan.OneScan(file)
+            summary = ScanSummary(s)
+            a = s.angle
+            if a in results:
+                results[a] = results[a] + summary
+            else:
+                results[a] = summary
+        except Exception as e:
+            print("...failed with:")
+            print(e)
+
     keys = list(results.keys())
     keys.sort()
     allscans = results[keys[0]]
@@ -292,6 +316,7 @@ def main():
         len(files), args.no_pages, args.no_plots))
 
     if not args.no_plots:
+        plt.ioff()
         for i, f in enumerate(files):
             prev = None
             if i > 0:
