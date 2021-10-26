@@ -68,20 +68,19 @@ def make_scan_plots(filename, force=False):
             plt.tight_layout()
             plt.savefig(output_plot)
 
-        output_plot = "../plots/TESrates/rate_{}.png".format(key)
+        output_plot = "../plots/TimeWeightedDrift/twd_{}.png".format(key)
         dependencies = depends+[filename, "onescan.py"]
         if common.needs_updating(output_plot, dependencies):
-            common.myfigure((5.5, 4.5), 25)
-            scan.plot_tes_rate()
+            common.myfigure((5.5, 3.5), 25)
+            scan.plot_timewt_drift()
             plt.tight_layout()
             plt.savefig(output_plot)
 
-        output_plot = "../plots/Radiographs/rg_{}.png".format(key)
-        dependencies = depends+[filename, "onescan.py", "radiograph.py"]
+        output_plot = "../plots/TESrates/rate_{}.png".format(key)
+        dependencies = depends+[filename, "onescan.py"]
         if common.needs_updating(output_plot, dependencies):
-            rg = onescan.compute_radiograph(scan, voxsize_nm=60)
-            common.myfigure((9.5, 4), 26)
-            rg.plot()
+            common.myfigure((5.5, 4.5), 26)
+            scan.plot_tes_rate()
             plt.tight_layout()
             plt.savefig(output_plot)
 
@@ -91,12 +90,17 @@ def make_scan_plots(filename, force=False):
 
 def make_scan_page(filename, force=False, prev=None, next=None):
     path, base = os.path.split(filename)
+    basebackslashed = base.replace("_", "\_")
     partialname = base.replace("Results_", "").replace(".hdf5", "")
     output_page = "../slab2021/scans/scan_{}.md".format(partialname)
     dependencies = depends+[filename]
     if common.needs_updating(output_page, dependencies) or force:
         _, date, index, angle, outin, _ = base.split("_")
-        angle = float(angle)
+        try:
+            angle = float(angle)
+        except Exception as e:
+            print("Problem in file {} with angle {}".format(base, angle))
+            raise e
         intangle = int(angle)
         strangle = "{:+5.1f}".format(angle)
         outin = outin.capitalize()
@@ -104,6 +108,7 @@ def make_scan_page(filename, force=False, prev=None, next=None):
         scan_plot = "scan_{}.png".format(partialname)
         targets_plot = "target_{}.png".format(partialname)
         radiograph = "rg_{}.png".format(partialname)
+        twd_plot = "twd_{}.png".format(partialname)
         prevpage = nextpage = ""
         if prev is not None:
             pbase = os.path.split(prev)[1]
@@ -116,9 +121,10 @@ def make_scan_page(filename, force=False, prev=None, next=None):
 
         plotfiles = OrderedDict()
         plotfiles["Radiograph"] = "/plots/Radiographs/rg_{}.png".format(partialname)
-        plotfiles["TES rates"]: "/plots/TESrates/rate_{}.png".format(partialname)
         plotfiles["Offset squares"] = "/plots/Targets/{}".format(targets_plot)
         plotfiles["Scan analysis"] = "/plots/ScanPlots/{}".format(scan_plot)
+        plotfiles["Time-weighted drift"] = "/plots/TimeWeightedDrift/{}".format(twd_plot)
+        plotfiles["TES rates"] = "/plots/TESrates/rate_{}.png".format(partialname)
         plotfiles["EDS analysis"] = "/plots/EDSPlots/{}".format(eds_plot)
         allplots_markdown = "\n\n".join(["![]({})".format(f) for f in plotfiles.values()])
 
@@ -131,7 +137,7 @@ layout: page
 ---
 [Up: Index of all scans](/slab2021/scans)
 
-Scan file name: {base}
+Scan file name: {basebackslashed}
 
 {allplots_markdown}
 
