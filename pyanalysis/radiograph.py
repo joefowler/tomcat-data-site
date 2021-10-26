@@ -21,9 +21,9 @@ class Radiograph:
         return Radiograph(self.rg, self.uncert, self.wt, self.xctr, self.yctr, self.xyedges,
                           self.basename, self.angle)
 
-    def add(self, other, shiftx=0, shifty=0):
+    def combine(self, other, shiftx=0, shifty=0, selfscale=1.0, otherscale=1.0):
         if self.angle != other.angle:
-            raise ValueError("Cannot add radiographs from unequal angles: {}, {}".format(
+            raise ValueError("Cannot combine radiographs from unequal angles: {}, {}".format(
                 self.angle, other.angle))
 
         def wtadd(A, wa, B, wb):
@@ -55,12 +55,18 @@ class Radiograph:
         w1[np.isnan(w1)] = 0
         w2[np.isnan(w2)] = 0
 
-        rg = wtadd(self.rg, w1, other.rg, w2)
-        wt = wtadd(self.wt, w1, other.wt, w2)
+        rg = wtadd(self.rg*selfscale, w1, other.rg*otherscale, w2)
+        wt = wtadd(self.wt*selfscale, w1, other.wt*otherscale, w2)
         uncert = wtadd(self.uncert, w1, other.uncert, w2)
         basename = ", ".join((self.basename, other.basename))
         return Radiograph(rg, uncert, wt, self.xctr, self.yctr, self.xyedges, basename,
                           self.angle)
+
+    def add(self, other, shiftx=0, shifty=0):
+        return self.combine(other, shiftx, shifty, 1.0, 1.0)
+
+    def subtract(self, other, shiftx=0, shifty=0):
+        return self.combine(other, shiftx, shifty, 1.0, -1.0)
 
     def plot(self, name="rg", vmin=None, vmax=None, midpct=95):
         plt.clf()
