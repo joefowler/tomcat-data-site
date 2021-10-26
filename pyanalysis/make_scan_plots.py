@@ -14,17 +14,6 @@ depends = [__file__, "common.py"]
 DIR = "/Users/fowlerj/data/tomcat2021/slab/"
 
 
-def get_all_hdf5s_sorted():
-    files = glob.glob(DIR+"LaLB/Results*.hdf5")
-    files += glob.glob(DIR+"La/Results*.hdf5")
-
-    def sortkey(path):
-        fname = os.path.split(path)[1]
-        return fname.lower()
-    files.sort(key=sortkey)
-    return files
-
-
 def make_scan_plots(filename, force=False):
     path, base = os.path.split(filename)
     partialname = base.replace("Results_", "").replace(".hdf5", "")
@@ -280,7 +269,7 @@ def make_summary_table(files, force=False):
 
 
 def make_good_dets_table():
-    files = get_all_hdf5s_sorted()
+    files = common.get_all_hdf5s_sorted()
     ratios = []
     with open("good_dets_table.csv", "w") as fp:
         for f in files:
@@ -308,7 +297,7 @@ def main():
     parser.add_argument("--no_pages", action="store_true", help="skip making page markdown files")
     parser.add_argument("--no_plots", action="store_true", help="skip making plots")
     args = parser.parse_args()
-    files = get_all_hdf5s_sorted()
+    files = common.get_all_hdf5s_sorted()
     if args.num_files >= 0:
         files = files[:args.num_files]
 

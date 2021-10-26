@@ -1,4 +1,5 @@
 import os
+import glob
 import pylab as plt
 
 
@@ -32,3 +33,20 @@ def myfigure(size, fignum=9):
     if abs(curr_size[0] - size[0]) + abs(curr_size[1] - size[1]) > .01:
         plt.close(fignum)
     return plt.figure(fignum, figsize=size)
+
+
+DIR = "/Users/fowlerj/data/tomcat2021/slab/"
+
+
+def get_all_hdf5s_sorted():
+    """
+    Return a time-sorted list of all data HDF5 files.
+    """
+    files = glob.glob(DIR+"LaLB/Results*.hdf5")
+    files += glob.glob(DIR+"La/Results*.hdf5")
+
+    def sortkey(path):
+        fname = os.path.split(path)[1]
+        return fname.lower()
+    files.sort(key=sortkey)
+    return files
