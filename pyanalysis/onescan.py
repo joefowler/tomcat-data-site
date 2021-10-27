@@ -24,8 +24,8 @@ class OneScan():
         self.good = f["detInfo/goodChans"][:]
         try:
             f["eds"]
-            self.eds = f["eds/sig"][:, 0]
-            self.eds_unc = f["eds/unc"][:, 0]
+            self.eds = f["eds/rate_target_line"][:]
+            self.eds_unc = f["eds/rate_unc_target_line"][:]
         except KeyError:
             print("No EDS data in {}. Yikes".format(filename))
         self.target = f["steps/corrected_sampleFixed"][:, :2]
@@ -70,12 +70,9 @@ class OneScan():
         plt.clf()
         ax = plt.subplot(211)
         idx = np.arange(1, 1+len(self.eds))
-        dur = self.duration
-        e = self.eds/dur
-        de = self.eds_unc/dur
-        scale = np.median(e)
-        e /= scale
-        de /= scale
+        scale = np.median(self.eds)
+        e = self.eds/scale
+        de = self.eds_unc/scale
 
         j = 0
         y = self.target[:, 1]
@@ -102,7 +99,7 @@ class OneScan():
         plt.subplot(212, aspect="equal")
         x, y = self.target.T
         cm = plt.cm.inferno
-        rate = self.eds/dur
+        rate = self.eds
         vmin, vmax = np.percentile(rate, [5, 95])
         plt.scatter(x, y, s=1400/self.Nx, marker="s", c=rate, vmin=vmin, vmax=vmax, cmap=cm)
         plt.xlabel("X location (mm)")
@@ -158,7 +155,7 @@ class OneScan():
         plt.xlim([0, 200])
         plt.xlabel("Position error (nm)")
         plt.ylabel("Time at error (sec per 2 nm bin)")
-        plt.title("Time-weighted position error {}".format(self.basename))
+        plt.title("Time-weighted drift {}".format(self.basename))
         drift_quantiles = np.percentile(np.abs(alldrifts), [50, 90])
         print("Drift median: {:.2f} nm, 90%ile: {:.2f} nm".format(*drift_quantiles))
         plt.text(.5, .9, "Drift < {:.2f} nm 50% of time".format(
