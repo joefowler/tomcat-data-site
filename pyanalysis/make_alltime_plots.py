@@ -64,16 +64,16 @@ def plot_eds(h=None):
     if h is None:
         target = os.path.join(common.DIR, "alldata_summary.hdf5")
         with h5py.File(target, "r") as h:
-            plot_eds(h)
+            return plot_eds(h)
     t0 = time.mktime((2021, 8, 31, 12, 0, 0, 0, 0, 1))  # Noon MDT on Aug 31
     t = h["starts"][:]-t0
     day = t//86400
     plt.clf()
-    rate = h["eds"][:]/h["durations"][:]
+    rate = h["eds"][:]
     plt.scatter(t/86400, rate, c=day % 12, cmap="Paired", s=3)
     plt.xlabel("Date (1.00=noon MDT Sept 1; 2.00=noon Sept 2)")
-    plt.ylabel("EDS Rate")
-    plt.title("EDS rate over time")
+    plt.ylabel("EDS Rate (Pt Lα counts per sec)")
+    plt.title("EDS rate over time (colors change each day at noon MDT)")
     plt.ylim([0, rate.max()*1.01])
     plt.xlim([2, t.max()/86400+0.1])
     plt.grid(True)
