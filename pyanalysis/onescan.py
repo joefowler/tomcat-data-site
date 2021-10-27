@@ -38,13 +38,13 @@ class OneScan():
         self.medianrates = {}
         self.xdet = {}
         self.ydet = {}
-        for k in f["tes"].keys():
+        for k, tesgrp in f["tes"].items():
             if not k.startswith("chan"):
                 continue
             cnum = int(k.replace("chan", ""))
-            self.medianrates[cnum] = np.median(f["tes/{}/sig".format(k)][:, 0]/self.duration)
-            self.xdet[cnum] = f["tes/{}/xdet".format(k)][0, 0]
-            self.ydet[cnum] = f["tes/{}/ydet".format(k)][0, 0]
+            self.medianrates[cnum] = np.median(tesgrp["sig"][:, 0]/self.duration)
+            self.xdet[cnum] = tesgrp["xdet"][0, 0]
+            self.ydet[cnum] = tesgrp["ydet"][0, 0]
         self.medianrate = np.median([x for x in self.medianrates.values()])
         self.Nx, self.Xcoords = findgrid(self.target[:, 0])
         self.Ny, self.Ycoords = findgrid(self.target[:, 1])
