@@ -70,8 +70,8 @@ class Radiograph:
 
     def plot(self, name="rg", vmin=None, vmax=None, midpct=95):
         plt.clf()
+        plt.subplot(111, aspect="equal")
         plt.title("Radiograph of {}".format(self.basename))
-        ax = plt.subplot(111, aspect="equal")
         xpix, ypix = self.xyedges
         z = self.rg
 
