@@ -14,8 +14,9 @@ class OneScan():
     Represent one raster scan on the target.
     """
 
-    def __init__(self, filename):
+    def __init__(self, filename, verbose=True):
         f = h5py.File(filename, "r")
+        self.verbose = verbose
         self.h5 = f
         self.filename = "/".join(filename.split(os.path.sep)[-3:])
         self.basename = os.path.basename(filename)
@@ -46,8 +47,39 @@ class OneScan():
             self.xdet[cnum] = tesgrp["xdet"][0, 0]
             self.ydet[cnum] = tesgrp["ydet"][0, 0]
         self.medianrate = np.median([x for x in self.medianrates.values()])
+
         self.Nx, self.Xcoords = findgrid(self.target[:, 0])
         self.Ny, self.Ycoords = findgrid(self.target[:, 1])
+        self._compute_good_bad_list()
+
+    def _compute_good_bad_list(self):
+        self.goodtes = []
+        self.badtes = []
+        for cnum, mr in self.medianrates.items():
+            if abs(mr/self.medianrate-1.0) > 0.3:
+                if self.verbose:
+                    print("Channel {} is bad because median Pt Lα rate={:.2f} standard={:.2f}".format(
+                        cnum, mr, self.medianrate))
+                self.badtes.append(cnum)
+            else:
+                self.goodtes.append(cnum)
+
+    def tes_count_array(self):
+        "Return array `counts` where `counts[i, j]` is TES counts for good tes `i` and dwell `j`."
+        return np.vstack([self.h5["tes/chan{:03d}/sig".format(c)][:, 0] for c in self.goodtes])
+
+    def tes_rate_array(self):
+        return self.tes_count_array()/self.duration
+
+    def compute_eds_scale_factor(self):
+        tes_rates = self.tes_rate_array()
+        median_tes = np.median(tes_rates, axis=0)  # median over TESs
+        raw_factor = np.median(median_tes/self.eds)  # median over dwell steps
+        # assume absorption is due to 50-50 SiO2 and Cu, total T=3.30 µm thick
+        mean_mu = (.005956 + .221777)/2  # loss per µm
+        T = 3.30  # µm of total thickness
+        sample_absorption = np.exp(-T/np.cos(self.angle/180*np.pi)*mean_mu)
+        return raw_factor/sample_absorption
 
     def plot_tes_rate(self):
         plt.clf()
@@ -59,11 +91,11 @@ class OneScan():
         for k, v in self.medianrates.items():
             plt.plot(self.xdet[k], self.ydet[k], "s", ms=14, color=cm(.5*v/self.medianrate))
             if v > self.medianrate*1.5:
-                color = "k"
+                txtcolor = "k"
             else:
-                color = "w"
+                txtcolor = "w"
             plt.text(self.xdet[k], self.ydet[k], "{:.1f}".format(
-                v), color=color, ha="center", va="center", fontsize="x-small")
+                v), color=txtcolor, ha="center", va="center", fontsize="x-small")
 
     def plot_eds_summary(self):
         "Plot a summary of the EDS rate vs time for this scan."

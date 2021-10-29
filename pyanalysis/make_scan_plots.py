@@ -294,6 +294,31 @@ def make_good_dets_table():
     return np.hstack(ratios)
 
 
+def report_eds_values(stop_after=None):
+    results = OrderedDict()
+    for angle in np.linspace(-45, 45, 13):
+        results[angle] = []
+
+    files = common.get_all_hdf5s_sorted()
+    print("Filename                                    Angle   Conv factor")
+    print("--------                                   ------   -----------")
+    for f in files[:stop_after]:
+        scan = onescan.OneScan(f, verbose=False)
+        esf = scan.compute_eds_scale_factor()
+        print("{:43s} {:5.1f}   {:.6f}".format(scan.basename, scan.angle, esf))
+        results[scan.angle].append(esf)
+
+    def median_abs_dev(x):
+        return np.median(np.abs(x-np.median(x)))
+    print()
+    print("Angle      Med(conv)  MedAbsDev(conv)")
+    print("---------  ---------  ---------------")
+    for a, r in results.items():
+        if len(r) == 0:
+            continue
+        print("{:5.1f} deg  {:.6f}      {:.6f}".format(a, np.median(r), median_abs_dev(r)))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Make scan plots and web pages.")
     parser.add_argument("-f", "--force-update", action="store_true",
