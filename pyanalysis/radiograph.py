@@ -21,52 +21,65 @@ class Radiograph:
         return Radiograph(self.rg, self.uncert, self.wt, self.xctr, self.yctr, self.xyedges,
                           self.basename, self.angle)
 
-    def combine(self, other, shiftx=0, shifty=0, selfscale=1.0, otherscale=1.0):
+    def _combine(self, other, shiftx=0, shifty=0, mode="add"):
         if self.angle != other.angle:
             raise ValueError("Cannot combine radiographs from unequal angles: {}, {}".format(
                 self.angle, other.angle))
 
-        def wtadd(A, wa, B, wb):
-            A = A.copy()
+        def shiftb(B):
             B = B.copy()
-            wb = wb.copy()
             if shiftx > 0:
                 B[:-shiftx, :] = B[shiftx:, :]
-                B[-shiftx, :] = 0
-                wb[:-shiftx, :] = wb[shiftx:, :]
-                wb[-shiftx, :] = 0
+                B[-shiftx:, :] = 0
             elif shiftx < 0:
                 B[-shiftx:, :] = B[:shiftx, :]
-                wb[-shiftx:, :] = wb[:shiftx, :]
+                B[:-shiftx, :] = 0
             if shifty > 0:
                 B[:, :-shifty] = B[:, shifty:]
                 B[:, -shifty] = 0
-                wb[:, :-shifty] = wb[:, shifty:]
-                wb[:, -shifty] = 0
             elif shifty < 0:
                 B[:, -shifty:] = B[:, :shifty]
-                wb[:, -shifty:] = wb[:, :shifty]
+                B[:, :-shifty] = 0
+            return B
+
+        def wtmean(A, wa, B, wb):
+            A = A.copy()
+            B = shiftb(B)
+            if not np.isscalar(wb):
+                wb = shiftb(wb)
             A[np.isnan(A) & ~np.isnan(B)] = 0
             B[np.isnan(B) & ~np.isnan(A)] = 0
             return (A*wa+B*wb)/(wa+wb)
 
-        w1 = self.uncert**-2
-        w2 = other.uncert**-2
-        w1[np.isnan(w1)] = 0
-        w2[np.isnan(w2)] = 0
+        def add(A, B):
+            return A + shiftb(B)
 
-        rg = wtadd(self.rg*selfscale, w1, other.rg*otherscale, w2)
-        wt = wtadd(self.wt*selfscale, w1, other.wt*otherscale, w2)
-        uncert = wtadd(self.uncert, w1, other.uncert, w2)
-        basename = ", ".join((self.basename, other.basename))
+        if mode in ("average", ):
+            w1 = self.uncert**-2
+            w2 = other.uncert**-2
+            w1[np.isnan(w1)] = 0
+            w2[np.isnan(w2)] = 0
+
+            rg = wtmean(self.rg, w1, other.rg, w2)
+            wt = add(self.wt, other.wt)
+            uncert = add(w1, w2)**-0.5
+            uncert[np.isinf(uncert)] = np.nan
+            basename = "Avg ({}, {})".format(self.basename, other.basename)
+        elif mode in ("subtract", "difference"):
+            rg = add(self.rg, -other.rg)
+            wt = add(self.wt, other.wt)
+            uncert = add(self.uncert**2, other.uncert**2)**0.5
+            basename = "Diff ({}, {})".format(self.basename, other.basename)
+        else:
+            raise ValueError("Radiograph._combine() requires mode='average' or mode='subtract'")
         return Radiograph(rg, uncert, wt, self.xctr, self.yctr, self.xyedges, basename,
                           self.angle)
 
-    def add(self, other, shiftx=0, shifty=0):
-        return self.combine(other, shiftx, shifty, 1.0, 1.0)
+    def average(self, other, shiftx=0, shifty=0):
+        return self._combine(other, shiftx, shifty, "average")
 
     def subtract(self, other, shiftx=0, shifty=0):
-        return self.combine(other, shiftx, shifty, 1.0, -1.0)
+        return self._combine(other, shiftx, shifty, "subtract")
 
     def plot(self, name="rg", vmin=None, vmax=None, midpct=95):
         plt.clf()
@@ -77,12 +90,16 @@ class Radiograph:
 
         if name == "rg":
             z = self.rg
+            label = "Radiograph value"
         elif name == "wt":
             z = self.wt
+            label = "Weights"
         elif name.startswith("un"):
             z = self.uncert
+            label = "Uncertainty"
         elif name.startswith("sig"):
             z = self.rg/self.uncert
+            label = "Signal to noise ratio"
 
         # If the vmin and/or vmax aren't given, we need to choose them.
         # Instead of the default (set equal to the lowest and highest z values),
@@ -99,7 +116,7 @@ class Radiograph:
         if vmax is None:
             vmax = phi+dp*5/midpct
         plt.pcolor(xpix, -ypix, z, vmin=vmin, vmax=vmax, cmap=plt.cm.inferno)
-        plt.colorbar(fraction=.07, location="bottom")
+        plt.colorbar(fraction=.07, location="bottom", label=label)
         plt.xlabel("X location (mm)")
         plt.ylabel("$-$Y location (mm)")
 
