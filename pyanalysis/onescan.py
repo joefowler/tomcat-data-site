@@ -36,6 +36,7 @@ class OneScan():
         self.drift = self.targetend-self.target
 
         self.duration = f["times/duration"][:]
+        self.start = f["times/start/ns"][:]*1e-9
         self.medianrates = {}
         self.xdet = {}
         self.ydet = {}
@@ -303,14 +304,34 @@ def summarize_scan(scan):
     plt.tight_layout()
 
 
-def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50.0, std_extent=True):
+eds_scale_factor = {
+    -45.0: .149195,
+    -37.5: .003347,
+    -30.0: .003230,
+    -22.5: .003117,
+    -15.0: .002998,
+    -7.5: .003098,
+    0.0: .003039,
+    7.5: .003043,
+    15.0: .003028,
+    22.5: .003139,
+    30.0: .003102,
+    37.5: .003224,
+    45.0: .003182,
+}
+
+
+def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50.0, std_extent=True,
+                       steps_combine=1):
     """
     Convert a scan to its 2d radiograph
     """
+    this_eds_scale_factor = eds_scale_factor[scan.angle]
     cosang = np.cos(scan.angle*np.pi/180.)
     magX = mag * cosang**2
     magY = mag * cosang
-    print("Magnifications: {:.2f}, {:.2f}".format(magX, magY))
+    print("Magnifications: {:.2f}, {:.2f}. EDS factor: {.6f}".format(
+        magX, magY, this_eds_scale_factor))
     voxsize_mm = voxsize_nm/1e6
     xnom = np.array(scan.target[:, 0])
     ynom = np.array(scan.target[:, 1])
@@ -366,17 +387,10 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
     ax.set_aspect("equal")
     plt.title("Pixel positions on sample (µm) $\\theta={:.1f}^\\circ$".format(scan.angle))
     total_photons = 0.0
-    for channum in range(1, 241):
+    for channum in scan.goodtes:
         k = "chan{:03d}".format(channum)
-        if k not in scan.h5["tes"]:
-            continue
-        mr = scan.medianrates[channum]
-        if abs(mr/scan.medianrate-1.0) > 0.3:
-            print("Skipping channel {} with mr={:.2f} standard={:.2f}".format(
-                channum, mr, scan.medianrate))
-            continue
-        print(k)
         g = f["tes/{}".format(k)]
+        print(k)
         try:
             X = g["xdet"][0, 0]/1e3  # In mm
             Y = g["ydet"][0, 0]/1e3
