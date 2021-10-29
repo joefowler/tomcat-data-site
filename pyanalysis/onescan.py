@@ -197,6 +197,54 @@ class OneScan():
             drift_quantiles[1]), transform=axis.transAxes, color="r", bbox=dict(facecolor="w", alpha=0.9))
 
 
+class OneSplitScan(OneScan):
+    """
+    Represent one raster scan on the target, split N ways
+    """
+
+    def __init__(self, filename):
+        f = h5py.File(filename, "r")
+        self.h5 = f
+        self.filename = "/".join(filename.split(os.path.sep)[-3:])
+        self.basename = os.path.basename(filename)
+        self.angle = float(self.basename.split("_")[3])
+
+        self.good = f["detInfo/goodChans"][:]
+
+        self.Nsteps, self.Nsplits = f["eds/sig"].shape
+        self.eds = f["eds/sig"][:].ravel()
+        self.eds_unc = f["eds/unc"][:].ravel()
+
+        x = f["steps/subDwellPos_sampleFixed_x"][:].ravel()
+        y = f["steps/subDwellPos_sampleFixed_y"][:].ravel()
+        self.target = np.vstack((x, y)).T
+        commandx = np.repeat(f["steps/command_sampleFixed"][:, 0], self.Nsplits)
+        commandy = np.repeat(f["steps/command_sampleFixed"][:, 1], self.Nsplits)
+        self.command = np.vstack((commandx, commandy)).T
+        self.offset = self.target-self.command
+
+        # Drift has to be hacked: no sub-dwell start/end info!
+        self.drift = np.roll(self.target, -1, axis=0)-self.target
+        self.drift[-1, :] = 0.0
+
+        self.duration = np.repeat(f["times/duration"][:self.Nsteps], self.Nsplits) / self.Nsplits
+
+        self.medianrates = {}
+        self.xdet = {}
+        self.ydet = {}
+        for k in f["tes"].keys():
+            if not k.startswith("chan"):
+                continue
+            cnum = int(k.replace("chan", ""))
+            g = f["tes"][k]
+            self.medianrates[cnum] = np.median(g["sig"][:].ravel()/self.duration)
+            self.xdet[cnum] = g["xdet"][0, 0]
+            self.ydet[cnum] = g["ydet"][0, 0]
+        self.medianrate = np.median([x for x in self.medianrates.values()])
+        self.Nx, self.Xcoords = findgrid(self.target[:, 0])
+        self.Ny, self.Ycoords = findgrid(self.target[:, 1])
+        self._compute_good_bad_list()
+
 
 def findgrid(x, mindist=2e-4):
     """
@@ -347,6 +395,8 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
         xshift = np.tan(scan.angle*np.pi/180.)*.01
         x0 = -.067+xshift
         x9 = -.033+xshift
+        x0 = -.07+xshift
+        x9 = -.03+xshift
         y0, y9 = -.009, -.002
     else:
         # Pixelize a region that's (6.5 mm/mag) around the nominal positions
@@ -403,14 +453,28 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
         # continue
         xtes = xnom + X/magX  # In mm
         ytes = ynom + Y/magY
-        for idx in range(Nstep):
-            this_signal = g["sig"][idx, 0]/scan.eds[idx]
+        eds = np.mean(scan.eds)
+        for idx in range(0, Nstep, steps_combine):
+            if isinstance(scan, OneSplitScan):
+                this_signal = g["sig"][:].ravel()[idx:idx+steps_combine]/eds
+                this_unc = g["sig_unc"][:].ravel()[idx:idx+steps_combine]/eds
+                if steps_combine > 1:
+                    this_signal = this_signal.mean()
+                    this_unc = (this_unc**-2).sum()**-.5
+                thisX = xtes[idx:idx+steps_combine].mean()
+                thisY = ytes[idx:idx+steps_combine].mean()
+            else:
+                assert steps_combine == 1
+                expectedsig = scan.eds[idx]*scan.duration[idx]*this_eds_scale_factor
+                this_signal = g["sig"][idx]/expectedsig
+                this_unc = g["sig_unc"][idx]/expectedsig
+                thisX = xtes[idx]
+                thisY = ytes[idx]
             if this_signal <= 0:
                 # print(k, idx, this_signal)
                 continue
-            this_unc = g["sig_unc"][idx, 0]/scan.eds[idx]
 
-            ix = int((xtes[idx]-x0)/voxsize_mm)
+            ix = int((thisX-x0)/voxsize_mm)
             i0 = ix-2
             i9 = ix+3
             if i9 < 0:
@@ -419,7 +483,7 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
                 i0 = 0
             if i9 >= nx+1:
                 i9 = nx
-            iy = int((ytes[idx]-y0)/voxsize_mm)
+            iy = int((thisY-y0)/voxsize_mm)
             j0 = iy-2
             j9 = iy+3
             if j9 < 0:
@@ -432,7 +496,7 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
             # print(xtes[idx]-xpix[ix, iy], ytes[idx]-ypix[ix, iy])
             # print((xtes[idx]-x0)/voxsize_mm, (ytes[idx]-y0)/voxsize_mm)
             # print("i,j: ", ix, i0, i9, iy, j0, j9)
-            pixd2 = (xtes[idx]-xpix[i0:i9, j0:j9])**2+(ytes[idx]-ypix[i0:i9, j0:j9])**2
+            pixd2 = (thisX-xpix[i0:i9, j0:j9])**2+(thisY-ypix[i0:i9, j0:j9])**2
             wt_spot = np.exp(-0.5*(pixd2*1e12/sig2))
             wt_sn = this_unc**-2
             weight = wt_spot*wt_sn
