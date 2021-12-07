@@ -21,6 +21,10 @@ class OneScan():
         self.filename = "/".join(filename.split(os.path.sep)[-3:])
         self.basename = os.path.basename(filename)
         self.angle = float(self.basename.split("_")[3])
+        try:
+            self.nsplits = f["numSplits"][()]
+        except KeyError:
+            self.nsplits = 1
 
         self.good = f["detInfo/goodChans"][:]
         try:
@@ -34,6 +38,10 @@ class OneScan():
         self.command = f["steps/command_sampleFixed"][:, :2]
         self.offset = self.target-self.command
         self.drift = self.targetend-self.target
+        if self.nsplits == 1:
+            self.position = self.target + 0.5*self.drift
+        else:
+            self.position = f["steps/subDwellPos_sampleFixed"][:, :2]
 
         self.duration = f["times/duration"][:]
         self.start = f["times/start/ns"][:]*1e-9
@@ -369,8 +377,27 @@ eds_scale_factor = {
 }
 
 
-def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50.0, std_extent=True,
-                       steps_combine=1):
+def radiograph_edges_std(angle_deg):
+    xshift = np.tan(angle_deg*np.pi/180.)*.01
+    x0 = -.067+xshift
+    x9 = -.033+xshift
+    x0 = -.07+xshift
+    x9 = -.03+xshift
+    y0, y9 = -.009, -.002
+    return x0, x9, y0, y9
+
+
+def radiograph_edges_full(xnom, ynom, magX, magY):
+    # Pixelize a region that's (6.5 mm/mag) around the nominal positions
+    border = 6.5
+    x0 = xnom.min()-border/magX
+    x9 = xnom.max()+border/magX
+    y0 = ynom.min()-border/magY
+    y9 = ynom.max()+border/magY
+    return x0, x9, y0, y9
+
+
+def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50.0, ncombine=1, std_extent=True):
     """
     Convert a scan to its 2d radiograph
     """
@@ -378,33 +405,18 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
     cosang = np.cos(scan.angle*np.pi/180.)
     magX = mag * cosang**2
     magY = mag * cosang
-    print("Magnifications: {:.2f}, {:.2f}. EDS factor: {.6f}".format(
+    print("Magnifications: {:.2f}, {:.2f}. EDS factor: {:.6f}".format(
         magX, magY, this_eds_scale_factor))
     voxsize_mm = voxsize_nm/1e6
-    xnom = np.array(scan.target[:, 0])
-    ynom = np.array(scan.target[:, 1])
-    # Correct to middle
-    dx = (scan.offset[1:, 0] - scan.offset[:-1, 0])
-    dy = (scan.offset[1:, 1] - scan.offset[:-1, 1])
-    xnom[:-1] += 0.5*dx
-    ynom[:-1] += 0.5*dy
+    xnom = np.asarray(scan.position[:, 0])
+    ynom = np.asarray(scan.position[:, 1])
     Nstep = len(xnom)
     assert Nstep == len(ynom)
 
     if std_extent:
-        xshift = np.tan(scan.angle*np.pi/180.)*.01
-        x0 = -.067+xshift
-        x9 = -.033+xshift
-        x0 = -.07+xshift
-        x9 = -.03+xshift
-        y0, y9 = -.009, -.002
+        x0, x9, y0, y9 = radiograph_edges_std(scan.angle)
     else:
-        # Pixelize a region that's (6.5 mm/mag) around the nominal positions
-        border = 6.5
-        x0 = xnom.min()-border/magX
-        x9 = xnom.max()+border/magX
-        y0 = ynom.min()-border/magY
-        y9 = ynom.max()+border/magY
+        x0, x9, y0, y9 = radiograph_edges_full(xnom, ynom, magX, magY)
     nx = int((x9-x0)/voxsize_mm+0.5)
     ny = int((y9-y0)/voxsize_mm+0.5)
     dx = nx*voxsize_mm
@@ -450,26 +462,16 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
         except IndexError:
             continue
         plt.plot(X/magX*1000, Y/magY*1000, "or")
-        # continue
         xtes = xnom + X/magX  # In mm
         ytes = ynom + Y/magY
-        eds = np.mean(scan.eds)
-        for idx in range(0, Nstep, steps_combine):
-            if isinstance(scan, OneSplitScan):
-                this_signal = g["sig"][:].ravel()[idx:idx+steps_combine]/eds
-                this_unc = g["sig_unc"][:].ravel()[idx:idx+steps_combine]/eds
-                if steps_combine > 1:
-                    this_signal = this_signal.mean()
-                    this_unc = (this_unc**-2).sum()**-.5
-                thisX = xtes[idx:idx+steps_combine].mean()
-                thisY = ytes[idx:idx+steps_combine].mean()
-            else:
-                assert steps_combine == 1
-                expectedsig = scan.eds[idx]*scan.duration[idx]*this_eds_scale_factor
-                this_signal = g["sig"][idx]/expectedsig
-                this_unc = g["sig_unc"][idx]/expectedsig
-                thisX = xtes[idx]
-                thisY = ytes[idx]
+        for idx in range(0, Nstep, ncombine):
+            eds_total = (scan.eds[idx:idx+ncombine]*scan.duration[idx:idx+ncombine]).sum()
+            expectedsig = eds_total*this_eds_scale_factor
+            this_signal = g["sig"][idx:idx+ncombine].sum()/expectedsig
+            sig_unc_combined = (g["sig_unc"][idx:idx+ncombine]**-2).sum()**-0.5
+            this_unc = sig_unc_combined/expectedsig
+            thisX = xtes[idx]
+            thisY = ytes[idx]
             if this_signal <= 0:
                 # print(k, idx, this_signal)
                 continue
