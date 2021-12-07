@@ -13,6 +13,63 @@ import common
 import onescan
 
 
+def time_use_survey(files):
+    # daynum = 0
+    # durations = []
+    # starts = []
+    # x, y = [], []
+    # idx = []
+    # names = []
+    # nsteps = []
+    referencetime = time.mktime((2021, 9, 2, 12, 0, 0, 0, 0, -1))  # 12:00 MDT on 2 Sept
+    dwelltime = np.zeros(52, dtype=float)
+    scantime = np.zeros(52, dtype=float)
+    alltime = np.zeros(52, dtype=np.bool)
+    daystart = np.zeros(52, dtype=float)
+    dayend = np.zeros(52, dtype=float)
+
+    for i, file in enumerate(files):
+        try:
+            scan = onescan.OneScan(file, verbose=False)
+            print("Analyzing {}".format(file))
+        except Exception:
+            print("Analyzing {} ...failed. Skipping to next file.".format(file))
+            continue
+        starttime = scan.h5["times/start/ns"][0]/1e9
+        endtime = scan.h5["times/start/ns"][-1]/1e9 + scan.duration[-1]
+        day = int((starttime-referencetime)//86400)
+        print(time.ctime(starttime), day)
+        dwelltime[day] += scan.duration.sum()
+        scantime[day] += endtime-starttime
+        alltime[day] = True
+        if daystart[day] == 0:
+            daystart[day] = starttime
+        if endtime > dayend[day]:
+            dayend[day] = endtime
+    return dwelltime, scantime, dayend-daystart, alltime
+
+
+def plot_time_use(dwelltime, scantime, fulltime, wason):
+    plt.clf()
+    day = np.arange(51)
+
+    # wasweekend = ((day-2) % 7) < 2
+    plt.plot(day, fulltime[:-1]/3600, "o", color="C2", label="End-start")
+    plt.plot(day, scantime[:-1]/3600, "o", color="C1", label="Scanning")
+    plt.plot(day, dwelltime[:-1]/3600, "o", color="C0", label="On target")
+    plt.legend()
+    z = np.zeros(2)
+    for i in range(7):
+        plt.plot(1.5+7*i+z, [-1, 24], color="#cccccc")
+        plt.plot(3.5+7*i+z, [-1, 24], color="#cccccc")
+    plt.xlabel("Day number [0-50]")
+    plt.ylabel("Hours")
+    plt.ylim([-.2, 26])
+    plt.plot([-10, 60], [24, 24], "k")
+    plt.xlim([-1, 51])
+    plt.title("TOMCAT time use survey: slab target Sept-Oct 2021")
+
+
 def generate_alldata_summary(files, force=False):
     target = os.path.join(common.DIR, "alldata_summary.hdf5")
     dependencies = [__file__, "common.py", "onescan.py"]
