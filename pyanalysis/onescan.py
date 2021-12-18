@@ -34,7 +34,11 @@ class OneScan():
         except KeyError:
             print("No EDS data in {}. Yikes".format(filename))
         self.target = f["steps/corrected_sampleFixed"][:, :2]
-        self.targetend = f["steps/endPos_sampleFixed"][:, :2]
+        if "endPos_sampleFixed" in f["steps"]:
+            self.targetend = f["steps/endPos_sampleFixed"][:, :2]
+        else:
+            # If endPos isn't there, assume these are nanodots.
+            self.targetend = self.target
         self.command = f["steps/command_sampleFixed"][:, :2]
         self.offset = self.target-self.command
         self.drift = self.targetend-self.target
@@ -53,8 +57,7 @@ class OneScan():
                 continue
             cnum = int(k.replace("chan", ""))
             self.medianrates[cnum] = np.median(tesgrp["sig"][:, 0]/self.duration)
-            self.xdet[cnum] = tesgrp["xdet"][0, 0]
-            self.ydet[cnum] = tesgrp["ydet"][0, 0]
+            self.xdet[cnum], self.ydet[cnum] = tesgrp["xy_microns"][:]
         self.medianrate = np.median([x for x in self.medianrates.values()])
 
         self.Nx, self.Xcoords = findgrid(self.target[:, 0])
@@ -454,8 +457,8 @@ def compute_radiograph(scan, parity=False, rotation=0.0, mag=6340, voxsize_nm=50
         g = f["tes/{}".format(k)]
         print(k)
         try:
-            X = g["xdet"][0, 0]/1e3  # In mm
-            Y = g["ydet"][0, 0]/1e3
+            X = scan.xdet[channum]/1e3  # In mm
+            Y = scan.ydet[channum]/1e3
             X, Y = costheta*X-sintheta*Y, sintheta*X+costheta*Y
             if parity:
                 X = -X
