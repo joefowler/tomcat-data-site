@@ -84,6 +84,15 @@ def make_scan_plots(filename, force=False):
             plt.tight_layout()
             plt.savefig(output_plot)
 
+        output_plot = "../plots/Radiographs/rg_{}.png".format(key)
+        dependencies = depends+[filename, "onescan.py", "radiograph.py"]
+        if common.needs_updating(output_plot, dependencies):
+            rg = onescan.compute_radiograph(scan, voxsize_nm=60)
+            common.myfigure((9.5, 4), 26)
+            rg.plot()
+            plt.tight_layout()
+            plt.savefig(output_plot)
+
     except Exception as e:
         print("Failed on {} with ".format(filename), e)
 
