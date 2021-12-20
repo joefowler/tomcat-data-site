@@ -39,7 +39,7 @@ _globalOffsets = GlobalOffsets()
 
 def position_offsets_mm(filename):
     """Use the singleton GlobalOffsets object to compute this file's offsets in mm. (Add to HDF5 values.)"""
-    return _global_offsets.position_offsets_mm(filename)
+    return _globalOffsets.position_offsets_mm(filename)
 
 
 class OneScan():
