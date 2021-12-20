@@ -5,8 +5,41 @@ import h5py
 import mass
 import os
 import glob
+import pandas
 
 import radiograph
+
+
+class GlobalOffsets():
+    """Singleton object to hold the global position information computed by Chris W."""
+
+    def __init__(self):
+        self.readdata = False
+        try:
+            p = pandas.read_csv("20211027_global_corrections_sr.csv")
+            self.offsetdata = p.set_index([" Moving HDF5"])
+            self.readdata = True
+        except Exception:
+            pass
+
+    def position_offsets_mm(self, filename):
+        if not self.readdata:
+            print("Warning! Could not read offsets for file {}".format(filename))
+            return 0.0, 0.0
+        try:
+            row = self.offsetdata.loc[filename]
+            return row[" Shift[0] (um)"]/1000, row[" Shift[1] (um)"]/1000
+        except Exception:
+            print("Warning! Exception computing offsets for file {}".format(filename))
+            return 0.0, 0.0
+
+
+_globalOffsets = GlobalOffsets()
+
+
+def position_offsets_mm(filename):
+    """Use the singleton GlobalOffsets object to compute this file's offsets in mm. (Add to HDF5 values.)"""
+    return _global_offsets.position_offsets_mm(filename)
 
 
 class OneScan():
@@ -14,7 +47,7 @@ class OneScan():
     Represent one raster scan on the target.
     """
 
-    def __init__(self, filename, verbose=True):
+    def __init__(self, filename, verbose=True, globaloffset=True):
         f = h5py.File(filename, "r")
         self.verbose = verbose
         self.h5 = f
@@ -33,13 +66,18 @@ class OneScan():
             self.eds_unc = f["eds/rate_unc_target_line"][:]
         except KeyError:
             print("No EDS data in {}. Yikes".format(filename))
-        self.target = f["steps/corrected_sampleFixed"][:, :2]
+
+        global_offsets = np.zeros(2, dtype=float)
+        if globaloffset:
+            global_offsets = np.array(position_offsets_mm(self.basename))
+        self.target = f["steps/corrected_sampleFixed"][:, :2] + global_offsets
         if "endPos_sampleFixed" in f["steps"]:
-            self.targetend = f["steps/endPos_sampleFixed"][:, :2]
+            self.targetend = f["steps/endPos_sampleFixed"][:, :2] + global_offsets
         else:
             # If endPos isn't there, assume these are nanodots.
             self.targetend = self.target
-        self.command = f["steps/command_sampleFixed"][:, :2]
+        self.command = f["steps/command_sampleFixed"][:, :2] + global_offsets
+        self.global_offsets = global_offsets
         self.offset = self.target-self.command
         self.drift = self.targetend-self.target
         if self.nsplits == 1:
@@ -54,6 +92,8 @@ class OneScan():
         self.ydet = {}
         for k, tesgrp in f["tes"].items():
             if not k.startswith("chan"):
+                continue
+            if "sig" not in tesgrp:
                 continue
             cnum = int(k.replace("chan", ""))
             self.medianrates[cnum] = np.median(tesgrp["sig"][:, 0]/self.duration)
