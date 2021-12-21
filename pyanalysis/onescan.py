@@ -97,7 +97,11 @@ class OneScan():
                 continue
             cnum = int(k.replace("chan", ""))
             self.medianrates[cnum] = np.median(tesgrp["sig"][:, 0]/self.duration)
-            self.xdet[cnum], self.ydet[cnum] = tesgrp["xy_microns"][:]
+            try:
+                self.xdet[cnum], self.ydet[cnum] = tesgrp["xy_microns"][:]
+            except KeyError:  # Assume the old way
+                self.xdet[cnum] = tesgrp["xdet"][0, 0]
+                self.ydet[cnum] = tesgrp["ydet"][0, 0]
         self.medianrate = np.median([x for x in self.medianrates.values()])
 
         self.Nx, self.Xcoords = findgrid(self.target[:, 0])
