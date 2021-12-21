@@ -16,6 +16,7 @@ slab2021/*.md
 slab2021/scans/scan*.md
 pyanalysis/plots_cache/*.p??
 pyanalysis/plots_cache/*.key
+pyanalysis/plots_cache/*.csv
 ### end Ignore the as-built site
 
 ### Ignore Python project typical files.
