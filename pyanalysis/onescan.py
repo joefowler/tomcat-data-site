@@ -1,10 +1,7 @@
 import numpy as np
-import scipy as sp
 import pylab as plt
 import h5py
-import mass
 import os
-import glob
 import pandas
 
 import radiograph
@@ -83,7 +80,7 @@ class OneScan():
         if self.nsplits == 1:
             self.position = self.target + 0.5*self.drift
         else:
-            self.position = f["steps/subDwellPos_sampleFixed"][:, :2]
+            self.position = f["steps/subDwellPos_sampleFixed"][:, :2] + global_offsets
 
         self.duration = f["times/duration"][:]
         self.start = f["times/start/ns"][:]*1e-9
@@ -189,9 +186,10 @@ class OneScan():
         cm = plt.cm.inferno
         rate = self.eds
         vmin, vmax = np.percentile(rate, [5, 95])
-        plt.scatter(x, y, s=1400/self.Nx, marker="s", c=rate, vmin=vmin, vmax=vmax, cmap=cm)
-        plt.xlabel("X location (mm)")
-        plt.ylabel("Y location (mm)")
+        plt.scatter(x*1000, y*1000, s=1400/self.Nx, marker="s",
+                    c=rate, vmin=vmin, vmax=vmax, cmap=cm)
+        plt.xlabel("X location (µm)")
+        plt.ylabel("Y location (µm)")
         plt.title("EDS rate vs scan position")
         plt.colorbar(location="bottom", label="EDS counts per second")
 
@@ -573,7 +571,7 @@ def compute_8_radiographs(scan, voxsize_nm=50.0, std_extent=True):
     rg1.extend(rg2)
     try:
         plot_8_radiographs(rg1)
-    except:
+    except Exception:
         pass
     return rg1
 
@@ -582,7 +580,7 @@ def plot_8_radiographs(rgs):
     "See compute_8_radiographs()"
     midpct = 98
     plo, phi = np.nanpercentile(rgs[0].rg.ravel(), [50-midpct/2, 50+midpct/2])
-    dp = phi-plo
+    # dp = phi-plo
     vmin = plo  # -dp*5/midpct
     vmax = phi  # +dp*5/midpct
     plt.clf()

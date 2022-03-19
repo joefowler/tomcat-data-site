@@ -115,10 +115,10 @@ class Radiograph:
             vmin = plo-dp*5/midpct
         if vmax is None:
             vmax = phi+dp*5/midpct
-        plt.pcolor(xpix, -ypix, z, vmin=vmin, vmax=vmax, cmap=plt.cm.inferno)
+        plt.pcolor(xpix*1000, -ypix*1000, z, vmin=vmin, vmax=vmax, cmap=plt.cm.inferno)
         plt.colorbar(fraction=.07, location="bottom", label=label)
-        plt.xlabel("X location (mm)")
-        plt.ylabel("$-$Y location (mm)")
+        plt.xlabel("X location (µm)")
+        plt.ylabel("$-$Y location (µm)")
 
     def smoother(self):
         raise NotImplementedError("This smoother isn't working yet, I think")
