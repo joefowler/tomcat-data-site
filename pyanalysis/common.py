@@ -35,13 +35,11 @@ def myfigure(size, fignum=9):
     return plt.figure(fignum, figsize=size)
 
 
-DIR = "/Users/fowlerj/data/tomcat2021/slab/"
-
-
-def get_all_hdf5s_sorted():
+def get_all_hdf5s_sorted(year):
     """
     Return a time-sorted list of all data HDF5 files.
     """
+    DIR = "/Users/fowlerj/data/tomcat{}/slab/".format(year)
     files = glob.glob(DIR+"LaLB/Results*.hdf5")
     files += glob.glob(DIR+"La/Results*.hdf5")
 

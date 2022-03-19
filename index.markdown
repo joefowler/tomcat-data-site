@@ -7,5 +7,6 @@ layout: home
 
 Each new measurement gets its own directory:
 
-* [Slab targets](slab2021)
+* [Slab targets 2022](slab2022)
 * [Nano-pattern target A](nano2021a)
+* [Slab targets 2021](slab2021)

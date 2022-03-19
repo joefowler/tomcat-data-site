@@ -10,7 +10,7 @@ import common
 import onescan
 
 depends = [__file__, "common.py"]
-DIR = "/Users/fowlerj/data/tomcat2022/slab/"
+DIR = "/Users/fowlerj/data/tomcat2021/slab/"
 
 
 def make_scan_plots(filename, force=False):
@@ -86,7 +86,7 @@ def make_scan_plots(filename, force=False):
         output_plot = "../plots/Radiographs/rg_{}.png".format(key)
         dependencies = depends+[filename, "onescan.py", "radiograph.py"]
         if common.needs_updating(output_plot, dependencies):
-            rg = onescan.compute_radiograph(scan, voxsize_nm=60, std_extent=False)
+            rg = onescan.compute_radiograph(scan, voxsize_nm=60)
             common.myfigure((9.5, 4), 26)
             rg.plot()
             plt.tight_layout()
@@ -100,7 +100,7 @@ def make_scan_page(filename, force=False, prev=None, next=None):
     path, base = os.path.split(filename)
     basebackslashed = base.replace("_", r"\_")
     partialname = base.replace("Results_", "").replace(".hdf5", "")
-    output_page = "../slab2022/scans/scan_{}.md".format(partialname)
+    output_page = "../slab2021/scans/scan_{}.md".format(partialname)
     dependencies = depends+[filename]
     if common.needs_updating(output_page, dependencies) or force:
         _, date, index, angle, outin, _ = base.split("_")
@@ -143,7 +143,7 @@ def make_scan_page(filename, force=False, prev=None, next=None):
 layout: page
 {prevpage}{nextpage}title: {outin} area, {strangle} degrees, {date}
 ---
-[Up: Index of all scans](/slab2022/scans)
+[Up: Index of all scans](/slab2021/scans)
 
 Scan file name: {basebackslashed}
 
@@ -175,7 +175,7 @@ Scan file name: {basebackslashed}
 
 
 def make_radiographs_page(files, force=False):
-    output_page = "../slab2022/radiographs.md"
+    output_page = "../slab2021/radiographs.md"
     if not common.needs_updating(output_page, depends):
         print("All-radiographs page '{}' is up to date...skipping".format(output_page))
         return
@@ -187,7 +187,7 @@ date: {}
 title: All radiographs
 ---
 
-[Up: slab target](/slab2022/)
+[Up: slab target](/slab2021/)
 
 """.format(time.ctime())
         fp.write(header)
@@ -270,7 +270,7 @@ def make_summary_table(files, force=False):
     for k in keys[1:]:
         allscans = allscans + results[k]
 
-    with open("../slab2022/data_summary.md", "w") as fp:
+    with open("../slab2021/data_summary.md", "w") as fp:
         lines = []
         lines.append(
             "| Angle | Scans<br/>total | Scans<br/>out+in | Time (hr) | Photons/1M<br/>Pt L&alpha; | Photons/1M<br/>TES Total | File size |")
@@ -283,7 +283,7 @@ def make_summary_table(files, force=False):
 
 
 def make_good_dets_table():
-    files = common.get_all_hdf5s_sorted(2022)
+    files = common.get_all_hdf5s_sorted(2021)
     ratios = []
     with open("good_dets_table.csv", "w") as fp:
         for f in files:
@@ -307,7 +307,7 @@ def report_eds_values(stop_after=None):
     for angle in np.linspace(-45, 45, 13):
         results[angle] = []
 
-    files = common.get_all_hdf5s_sorted(2022)
+    files = common.get_all_hdf5s_sorted(2021)
     print("Filename                                    Angle   Conv factor")
     print("--------                                   ------   -----------")
     for f in files[:stop_after]:
@@ -336,7 +336,7 @@ def main():
     parser.add_argument("--no_pages", action="store_true", help="skip making page markdown files")
     parser.add_argument("--no_plots", action="store_true", help="skip making plots")
     args = parser.parse_args()
-    files = common.get_all_hdf5s_sorted(2022)
+    files = common.get_all_hdf5s_sorted(2021)
     if args.num_files >= 0:
         files = files[:args.num_files]
 
